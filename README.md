@@ -1,1 +1,1 @@
-# XAI_GAN
+# EXGAN
