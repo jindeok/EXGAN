@@ -72,10 +72,12 @@ class XAIGAN:
             )
         idx = get_indices(dataset, self.args.MNISTlabel) 
         self.dataloader = DataLoader(dataset,batch_size=self.args.batch_size, sampler = torch.utils.data.sampler.SubsetRandomSampler(idx))
-
+  
+        self.alpha = args.alpha
+        self.beta = args.beta
         
         
-    def trainGAN(self):
+    def train_GAN(self):
         # Loss function
         adversarial_loss = torch.nn.BCELoss()
         # Initialize generator and discriminator
@@ -140,9 +142,107 @@ class XAIGAN:
         
                 batches_done = epoch * len(self.dataloader) + i
                 if batches_done % self.args.sample_interval == 0:
-                    save_image(gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
+                    save_image(gen_imgs.data[:16], "images/%d.png" % batches_done, nrow=4, normalize=True)
                 
         return discriminator, gen_imgs.data[:self.args.shots], real_imgs.data[:self.args.shots]
+    
+    
+    
+    def train_dualGAN(self, common_mask):
+        # Loss function
+        adversarial_loss = torch.nn.BCELoss()
+        # Initialize generator and discriminator
+        generator = XAIGAN.Generator(self.args, self.img_shape)
+        discriminator = XAIGAN.Discriminator(self.args, self.img_shape)
+        discriminator_mask = XAIGAN.Discriminator(self.args, self.img_shape)
+        
+        if self.cuda:
+            generator.cuda()
+            discriminator.cuda()
+            discriminator_mask.cuda()
+            adversarial_loss.cuda()
+            common_mask = common_mask.cuda()
+            
+        optimizer_G = torch.optim.Adam(generator.parameters(), lr=self.args.lr, betas=(self.args.b1, self.args.b2))
+        optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=self.args.lr, betas=(self.args.b1, self.args.b2))
+        optimizer_Dm = torch.optim.Adam(discriminator.parameters(), lr=self.args.lr, betas=(self.args.b1, self.args.b2))
+        
+        Tensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
+
+        for epoch in range(self.args.n_epochs_dual):
+            for i, (imgs, _) in enumerate(self.dataloader):
+                
+                if i > self.args.shots: # for controlling few-shit condition
+                    break
+        
+                # Adversarial ground truths for D
+                valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False)
+                fake = Variable(Tensor(imgs.size(0), 1).fill_(0.0), requires_grad=False)
+
+        
+                # Configure input
+                real_imgs = Variable(imgs.type(Tensor))
+                real_imgs_mask = real_imgs * common_mask
+        
+                # -----------------
+                #  Train Generator
+                # -----------------
+        
+                optimizer_G.zero_grad()
+        
+                # Sample noise as generator input
+                z = Variable(Tensor(np.random.normal(0, 1, (imgs.shape[0], self.args.latent_dim))))
+        
+                # Generate a batch of images
+                gen_imgs = generator(z)
+                gen_imgs_mask = gen_imgs * common_mask
+        
+                # Loss measures generator's ability to fool the discriminator
+                g_loss = (1-self.beta) * adversarial_loss(discriminator(gen_imgs), valid) \
+                    + self.beta * adversarial_loss(discriminator_mask(gen_imgs_mask), valid)
+        
+                g_loss.backward()
+                optimizer_G.step()
+        
+                # ---------------------
+                #  Train Discriminator
+                # ---------------------
+        
+                optimizer_D.zero_grad()
+        
+                # Measure discriminator's ability to classify real from generated samples
+                real_loss = adversarial_loss(discriminator(real_imgs), valid)
+                fake_loss = adversarial_loss(discriminator(gen_imgs.detach()), fake)
+                d_loss = (1-self.beta) * (real_loss + fake_loss) / 2
+                
+        
+                d_loss.backward()
+                optimizer_D.step()
+                
+                # ---------------------
+                #  Train Mask_Discriminator
+                # ---------------------
+        
+                optimizer_Dm.zero_grad()
+        
+                # Measure discriminator's ability to classify real from generated samples
+                real_loss_mask = adversarial_loss(discriminator_mask(real_imgs_mask), valid)
+                fake_loss_mask = adversarial_loss(discriminator_mask(gen_imgs_mask.detach()), fake)
+                dm_loss = self.beta * (real_loss_mask + fake_loss_mask) / 2
+                
+        
+                dm_loss.backward()
+                optimizer_Dm.step()
+        
+                print(
+                    "[Epoch %d/%d] [D loss: %f] [Dm loss: %f] [G loss: %f]"
+                    % (epoch, self.args.n_epochs_dual, d_loss.item(), dm_loss.item(), g_loss.item())
+                )
+        
+                batches_done = epoch * len(self.dataloader) + i
+                if epoch % 20 == 0:
+                    save_image(gen_imgs.data[:16], "images/EXGAN_%d.png" % epoch, nrow=4, normalize=True)
+                
     
     def common_masking(self, D, samples, reals):
         
@@ -165,7 +265,7 @@ class XAIGAN:
         for hs, hr in zip(heatmap_samples[0], heatmap_reals[0]):
             hs = hs.cpu()
             hr = hr.cpu()
-            heatmap_com += self.args.alpha * hs + (1-self.args.alpha) * hr
+            heatmap_com += self.alpha * hs + (1-self.alpha) * hr
         # takes average
         heatmap_com /= self.args.shots  
         
@@ -179,11 +279,6 @@ class XAIGAN:
         
         return common_mask
     
-
-        
-    
-        
-        
 
     class Generator(nn.Module):
         def __init__(self, args, img_shape):
