@@ -42,7 +42,7 @@ def imshow(img):
     
 def getmasking(tensor, version = 'thresh', thresh = 0.001):
     '''
-    top-k version can be implemented later.
+    top-k version should be implemented later.
 
     '''
     if version == 'thresh':
