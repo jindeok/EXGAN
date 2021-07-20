@@ -1,6 +1,6 @@
 # EXGAN
 
------ ARGUMENT HELPER -----
+----- ARGUMENT HELPER ---------------------------------------------------------------------------------------------------------
 
 - n_epochs : number of epochs of training for base set generator
 - n_epochs_dual : number of epochs of dual D - training for support set generator
