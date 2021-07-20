@@ -1,4 +1,6 @@
-# EXGAN_MNIST prototypes for future gait application
+# EXGAN_MNIST 
+
+desc: prototypes for future gait application
 
 ----- ARGUMENT HELPER ----------------------------------------
 
