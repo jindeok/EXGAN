@@ -49,6 +49,6 @@ print(args)
 
 
 xaigan = XAIGAN(args)
-D, samples, reals = xaigan.train_GAN()
-common_mask= xaigan.common_masking(D, samples, reals)
-xaigan.train_dualGAN(common_mask) 
+D, samples, reals = xaigan.train_GAN()                           # 1st step
+common_mask= xaigan.common_masking(D, samples, reals)            # 2nd step
+xaigan.train_dualGAN(common_mask)                                # 3rd step
