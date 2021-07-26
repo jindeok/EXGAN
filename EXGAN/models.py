@@ -40,13 +40,27 @@ def imshow(img):
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
     
-def getmasking(tensor, version = 'thresh', thresh = 0.001):
+def getmasking(tensor, version = 'thresh', thresh = 0.001, portion = 0.2):
     '''
-    top-k version should be implemented later.
+    top-k version can be implemented later.
 
     '''
     if version == 'thresh':
         return (tensor > thresh).float()
+    if version == 'topk':
+        
+        # flatten tensor
+        fl = tensor[0].flatten()
+        # number to activate
+        n = int(len(fl) * portion)
+        # extract topk value indice 
+        val, ind = torch.topk(fl, n)
+        # assign ind values
+        masked = torch.zeros(len(fl))
+        masked[ind] = val.float()
+        # reshape it and return tensor
+        return masked.reshape(tensor.shape)
+    
     else:
         return (tensor>tensor.mean()).float() 
 
@@ -168,7 +182,7 @@ class XAIGAN:
         optimizer_Dm = torch.optim.Adam(discriminator.parameters(), lr=self.args.lr, betas=(self.args.b1, self.args.b2))
         
         Tensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
-
+        loss_hist = []
         for epoch in range(self.args.n_epochs_dual):
             for i, (imgs, _) in enumerate(self.dataloader):
                 
@@ -238,11 +252,13 @@ class XAIGAN:
                     "[Epoch %d/%d] [D loss: %f] [Dm loss: %f] [G loss: %f]"
                     % (epoch, self.args.n_epochs_dual, d_loss.item(), dm_loss.item(), g_loss.item())
                 )
-        
+                tot_loss = d_loss.item() + dm_loss.item() + g_loss.item()
                 batches_done = epoch * len(self.dataloader) + i
                 if epoch % 20 == 0:
                     save_image(gen_imgs.data[:16], "images/EXGAN_%d.png" % epoch, nrow=4, normalize=True)
-                
+                    
+            loss_hist.append(tot_loss)
+        plt.plot(loss_hist)
     
     def common_masking(self, D, samples, reals):
         
@@ -274,9 +290,9 @@ class XAIGAN:
         # reals_np = reals.cpu()
         # imshow(torchvision.utils.make_grid(reals_np[0][0]))
         # # visualize heatmap
-        # plt.imshow(heatmap[0][0][0].cpu(), cmap="seismic", clim=(-0.25, 0.25))
-        common_mask = getmasking(heatmap_com, version = 'average')
-        
+        # plt.imshow(heatmap_com[0].cpu(), cmap="seismic")
+        common_mask = getmasking(heatmap_com, version = 'topk', portion = 0.3)
+       # print("shape", common_mask.shape)
         return common_mask
     
 
