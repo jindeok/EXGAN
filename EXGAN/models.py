@@ -40,13 +40,33 @@ def imshow(img):
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
     
-def getmasking(tensor, version = 'thresh', thresh = 0.001, portion = 0.2):
+def getmasking(tensor, version = 'thresh', thresh = 0.001, portion = 0.3):
     '''
-    top-k version can be implemented later.
+    
+
+    Parameters
+    ----------
+    tensor : TYPE
+        target tensor input
+    version : TYPE, optional
+        'thresh': theresholding based on attribution value
+        'topk': extract top k portion high attribution value
+        'mean' : upper than mean attribution values would be activated
+    thresh : TYPE, optional
+        theresholding value. The default is 0.001.
+    portion : TYPE, optional
+        the portion of highest attribution value when the version is 'topk'. The default is 0.3.
+
+    Returns
+    -------
+    masking matrix that activate(1) and deactivate(0) components
 
     '''
+
+
     if version == 'thresh':
         return (tensor > thresh).float()
+    
     if version == 'topk':
         
         # flatten tensor
@@ -57,7 +77,7 @@ def getmasking(tensor, version = 'thresh', thresh = 0.001, portion = 0.2):
         val, ind = torch.topk(fl, n)
         # assign ind values
         masked = torch.zeros(len(fl))
-        masked[ind] = val.float()
+        masked[ind] = 1
         # reshape it and return tensor
         return masked.reshape(tensor.shape)
     
@@ -257,8 +277,15 @@ class XAIGAN:
                 if epoch % 20 == 0:
                     save_image(gen_imgs.data[:16], "images/EXGAN_%d.png" % epoch, nrow=4, normalize=True)
                     
-            loss_hist.append(tot_loss)
-        plt.plot(loss_hist)
+        if self.args.eval_mode == True:
+            number_to_gen = 100 #should be lower than batch size
+            for i in range(number_to_gen):
+                save_image(gen_imgs.data[i],"samples/sample_%d.png"%i, normalize=True)
+                save_image(real_imgs.data[i],"reals/real_%d.png"%i, normalize=True)
+                    
+                    
+        #     loss_hist.append(tot_loss)
+        # plt.plot(loss_hist)
     
     def common_masking(self, D, samples, reals):
         
@@ -293,7 +320,10 @@ class XAIGAN:
         # plt.imshow(heatmap_com[0].cpu(), cmap="seismic")
         common_mask = getmasking(heatmap_com, version = 'topk', portion = 0.3)
        # print("shape", common_mask.shape)
+       
         return common_mask
+    
+
     
 
     class Generator(nn.Module):
