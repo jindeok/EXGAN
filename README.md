@@ -1,7 +1,7 @@
 # EXGAN_MNIST 
 
 Description : a prototype version for future gait application
-few shot
+few shot -> x
 
 ----- ARGUMENT HELPER ----------------------------------------
 
