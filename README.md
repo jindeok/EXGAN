@@ -1,4 +1,4 @@
-# EXGAN_MNIST 
+# EXGAN
 
 Description : a prototype version 
 
