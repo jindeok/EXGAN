@@ -16,15 +16,6 @@ import torch
 
 from models import *
 
-'''
-해야할 일 정리
-
-1. 듀얼 트레이닝 베이스
-2. 마스킹 뽑아내는 모듈{랜덤 샘플링 N개 + 뽑아내는 인터발 설정}
-3. celebA 데이터로더 
-4. DCGAN 모델
-'''
-
 
 os.makedirs("images", exist_ok=True)
 
